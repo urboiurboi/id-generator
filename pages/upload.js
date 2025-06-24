@@ -1,58 +1,44 @@
-import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+export default function UploadForm() {
+  async function handleSubmit(event) {
+    event.preventDefault()
 
-export default function Upload() {
-  const [file, setFile] = useState(null);
-  const [message, setMessage] = useState('');
+    const fileInput = event.target.fileInput.files[0]
+    const reader = new FileReader()
 
-  async function handleUpload(event) {
-    event.preventDefault();
-    if (!file) {
-      setMessage('Please select a file first');
-      return;
+    reader.onloadend = async () => {
+      const base64File = reader.result
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: event.target.nombre.value,
+          numeroId: event.target.numeroId.value,
+          instagram: event.target.instagram.value,
+          colorDeFondo: event.target.colorDeFondo.value,
+          file: base64File
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        alert('Upload success!')
+      } else {
+        alert('Error: ' + data.error)
+      }
     }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    let { error: uploadError } = await supabase.storage
-      .from('uploads')  // you will create this bucket soon
-      .upload(filePath, file);
-
-    if (uploadError) {
-      setMessage('Upload error: ' + uploadError.message);
-      return;
-    }
-
-    // Get public URL
-    const { publicURL, error: urlError } = supabase.storage
-      .from('uploads')
-      .getPublicUrl(filePath);
-
-    if (urlError) {
-      setMessage('URL error: ' + urlError.message);
-      return;
-    }
-
-    // Save file info to DB
-    const { data, error: dbError } = await supabase
-      .from('files')
-      .insert([{ file_name: file.name, file_url: publicURL }]);
-
-    if (dbError) {
-      setMessage('DB error: ' + dbError.message);
-      return;
-    }
-
-    setMessage('File uploaded successfully!');
+    reader.readAsDataURL(fileInput)
   }
 
   return (
-    <form onSubmit={handleUpload}>
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+    <form onSubmit={handleSubmit}>
+      <input name="nombre" placeholder="Nombre/Apodo" required />
+      <input name="numeroId" placeholder="Número de ID" required />
+      <input name="instagram" placeholder="Instagram @" />
+      <input name="colorDeFondo" placeholder="Color de Fondo" required />
+      <input type="file" name="fileInput" accept="image/*" required />
       <button type="submit">Upload</button>
-      <p>{message}</p>
     </form>
-  );
+  )
 }
